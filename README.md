@@ -1,8 +1,8 @@
-This is a collection of thoughts on securing a modern Apple Mac computer using macOS (formerly *"OS X"*) 10.12 "Sierra", as well as steps to improving online privacy.
+This is a collection of thoughts on securing a modern Apple Mac computer using macOS (formerly *OS X*) 10.12 "Sierra", as well as steps to improving online privacy.
 
 This guide is targeted to “power users” who wish to adopt enterprise-standard security, but is also suitable for novice users with an interest in improving their privacy and security on a Mac.
 
-There is no security silver bullet. A system is only as secure as its administrator is capable of making it.
+A system is only as secure as its administrator is capable of making it. There is no one single technology, software, nor technique to guarantee perfect computer security; a modern operating system and computer is very complex, and requires numerous incremental changes to meaningfully improve one's security and privacy posture.
 
 I am **not** responsible if you break a Mac by following any of these steps.
 
@@ -52,6 +52,7 @@ If you wish to make a correction or improvement, please send a pull request or [
     - [DTrace](#dtrace)
     - [Execution](#execution)
     - [Network](#network)
+- [Binary Whitelisting](#binary-whitelisting)
 - [Miscellaneous](#miscellaneous)
 - [Related software](#related-software)
 - [Additional resources](#additional-resources)
@@ -62,19 +63,21 @@ The standard best security practices apply:
 
 * Create a threat model
 	* What are you trying to protect and from whom? Is your adversary a [three letter agency](https://theintercept.com/document/2015/03/10/strawhorse-attacking-macos-ios-software-development-kit/) (if so, you may want to consider using [OpenBSD](http://www.openbsd.org/) instead), a nosy eavesdropper on the network, or determined [apt](https://en.wikipedia.org/wiki/Advanced_persistent_threat) orchestrating a campaign against you?
-	* Study and recognize threats and how to reduce attack surface.
+	* Study and [recognize threats](https://www.usenix.org/system/files/1401_08-12_mickens.pdf) and how to reduce attack surface against them.
 
 * Keep the system up to date
 	* Patch, patch, patch your system and software.
+	* macOS system updates can be completed using the App Store application, or the `softwareupdate` command-line utility - neither requires registering an Apple account.
 	* Subscribe to announcement mailing lists (e.g., [Apple security-announce](https://lists.apple.com/mailman/listinfo/security-announce)) for programs you use often.
 
 * Encrypt sensitive data
-	* In addition to full disk encryption, create one or many encrypted containers to store passwords, keys and personal documents.
+	* In addition to full disk encryption, create one or many encrypted containers to store passwords, keys, personal documents, and other data at rest.
 	* This will mitigate damage in case of compromise and data exfiltration.
 
 * Frequent backups
-	* Create regular backups of your data and be ready to reimage in case of compromise.
+	* Create [regular backups](https://www.amazon.com/o/ASIN/0596102461/backupcentral) of your data and be ready to reimage in case of compromise.
 	* Always encrypt before copying backups to external media or the "cloud".
+	* Verify backups work by testing them regularly, for example by accessing certain files or performing a hash based comparison.
 
 * Click carefully
 	* Ultimately, the security of a system can be reduced to its administrator.
@@ -140,7 +143,7 @@ Sealed Resources version=2 rules=7 files=137
 Internal requirements count=1 size=124
 ```
 
-macOS installers can be made with the `createinstallmedia` utility included in `Install macOS Sierra.app/Contents/Resources/`. See [Create a bootable installer for OS X Yosemite](https://support.apple.com/en-us/HT201372), or run the utility without arguments to see how it works.
+macOS installers can be made with the `createinstallmedia` utility included in `Install macOS Sierra.app/Contents/Resources/`. See [Create a bootable installer for macOS](https://support.apple.com/en-us/HT201372), or run the utility without arguments to see how it works.
 
 **Note** Apple's installer [does not appear to work](https://github.com/drduh/OS-X-Security-and-Privacy-Guide/issues/120) across OS versions. If you want to build a 10.12 image, for example, the following steps must be run on a 10.12 machine!
 
@@ -171,6 +174,8 @@ To create a custom, installable image which can be [restored](https://en.wikiped
 With Finder, right click on the app, select **Show Package Contents** and navigate to **Contents** > **SharedSupport** to find the file `InstallESD.dmg`.
 
 You can [verify](https://support.apple.com/en-us/HT201259) the following cryptographic hashes to ensure you have the same copy with `openssl sha1 InstallESD.dmg` or `shasum -a 1 InstallESD.dmg` or `shasum -a 256 InstallESD.dmg` (in Finder, you can drag the file into a Terminal window to provide the full path).
+
+To determine which macOS versions and builds originally shipped with or are available for your Mac, see [HT204319](https://support.apple.com/en-us/HT204319).
 
 See [InstallESD_Hashes.csv](https://github.com/drduh/OS-X-Security-and-Privacy-Guide/blob/master/InstallESD_Hashes.csv) in this repository for a list of current and previous file hashes. You can also Google the cryptographic hashes to ensure the file is genuine and has not been tampered with.
 
@@ -320,7 +325,7 @@ Take and Restore from saved guest vm snapshots before and after attempting risky
 
 ## First boot
 
-**Note** Before setting up macOS, consider disconnecting networking and configuring a firewall(s) first.
+**Note** Before setting up macOS, consider disconnecting networking and configuring a firewall(s) first. However, [late 2016 MacBooks](https://www.ifixit.com/Device/MacBook_Pro_15%22_Late_2016_Touch_Bar) with Touch Bar hardware [require online OS activation](https://onemoreadmin.wordpress.com/2016/11/27/the-untouchables-apples-new-os-activation-for-touch-bar-macbook-pros/).
 
 On first boot, hold `Command` `Option` `P` `R` keys to [clear NVRAM](https://support.apple.com/en-us/HT204063).
 
@@ -328,7 +333,7 @@ When macOS first starts, you'll be greeted by **Setup Assistant**.
 
 When creating your account, use a [strong password](http://www.explainxkcd.com/wiki/index.php/936:_Password_Strength) without a hint.
 
-If you enter your real name at the account setup process, be aware that your [computer's name and local hostname](https://support.apple.com/kb/PH18720) will be comprised of that name (e.g., *John Appleseed's MacBook*) and thus will appear on local networks and in various preference files. You can change them both in **System Preferences > Sharing** or with the following commands:
+If you enter your real name at the account setup process, be aware that your [computer's name and local hostname](https://support.apple.com/kb/PH18720) will comprise that name (e.g., *John Appleseed's MacBook*) and thus will appear on local networks and in various preference files. You can change them both in **System Preferences > Sharing** or with the following commands:
 
 	$ sudo scutil --set ComputerName your_computer_name
 
@@ -338,7 +343,7 @@ If you enter your real name at the account setup process, be aware that your [co
 
 The first user account is always an admin account. Admin accounts are members of the admin group and have access to `sudo`, which allows them to usurp other accounts, in particular root, and gives them effective control over the system. Any program that the admin executes can potentially obtain the same access, making this a security risk. Utilities like `sudo` have [weaknesses that can be exploited](https://bogner.sh/2014/03/another-mac-os-x-sudo-password-bypass/) by concurrently running programs and many panes in System Preferences are [unlocked by default](http://csrc.nist.gov/publications/drafts/800-179/sp800_179_draft.pdf) [p. 61–62] for admin accounts. It is considered a best practice by [Apple](https://help.apple.com/machelp/mac/10.12/index.html#/mh11389) and [others](http://csrc.nist.gov/publications/drafts/800-179/sp800_179_draft.pdf) [p. 41–42] to use a separate standard account for day-to-day work and use the admin account for installations and system configuration.
 
-It is not strictly required to ever log into the admin account via the OS X login screen. The system will prompt for authentication when required and Terminal can do the rest. To that end, Apple provides some [recommendations](https://support.apple.com/HT203998) for hiding the admin account and its home directory. This can be an elegant solution to avoid having a visible 'ghost' account. The admin account can also be [removed from FileVault](http://apple.stackexchange.com/a/94373).
+It is not strictly required to ever log into the admin account via the macOS login screen. The system will prompt for authentication when required and Terminal can do the rest. To that end, Apple provides some [recommendations](https://support.apple.com/HT203998) for hiding the admin account and its home directory. This can be an elegant solution to avoid having a visible 'ghost' account. The admin account can also be [removed from FileVault](http://apple.stackexchange.com/a/94373).
 
 #### Caveats
 
@@ -391,7 +396,7 @@ You may wish to enforce **hibernation** and evict FileVault keys from memory ins
     $ sudo pmset -a destroyfvkeyonstandby 1
     $ sudo pmset -a hibernatemode 25
 
-> All computers have firmware of some type—EFI, BIOS—to help in the discovery of hardware components and ultimately to properly bootstrap the computer using the desired OS instance. In the case of Apple hardware and the use of EFI, Apple stores relevant information within EFI to aid in the functionality of OS X. For example, the FileVault key is stored in EFI to transparently come out of standby mode.
+> All computers have firmware of some type—EFI, BIOS—to help in the discovery of hardware components and ultimately to properly bootstrap the computer using the desired OS instance. In the case of Apple hardware and the use of EFI, Apple stores relevant information within EFI to aid in the functionality of macOS. For example, the FileVault key is stored in EFI to transparently come out of standby mode.
 
 > Organizations especially sensitive to a high-attack environment, or potentially exposed to full device access when the device is in standby mode, should mitigate this risk by destroying the FileVault key in firmware. Doing so doesn’t destroy the use of FileVault, but simply requires the user to enter the password in order for the system to come out of standby mode.
 
@@ -439,9 +444,9 @@ Finally, you may wish to prevent *built-in software* as well as *code-signed, do
 
     $ sudo /usr/libexec/ApplicationFirewall/socketfilterfw --setallowsignedapp off
 
-> Applications that are signed by a valid certificate authority are automatically added to the list of allowed apps, rather than prompting the user to authorize them. Apps included in OS X are signed by Apple and are allowed to receive incoming connections when this setting is enabled. For example, since iTunes is already signed by Apple, it is automatically allowed to receive incoming connections through the firewall.
+> Applications that are signed by a valid certificate authority are automatically added to the list of allowed apps, rather than prompting the user to authorize them. Apps included in macOS are signed by Apple and are allowed to receive incoming connections when this setting is enabled. For example, since iTunes is already signed by Apple, it is automatically allowed to receive incoming connections through the firewall.
 
-> If you run an unsigned app that is not listed in the firewall list, a dialog appears with options to Allow or Deny connections for the app. If you choose Allow, OS X signs the application and automatically adds it to the firewall list. If you choose Deny, OS X adds it to the list but denies incoming connections intended for this app.
+> If you run an unsigned app that is not listed in the firewall list, a dialog appears with options to Allow or Deny connections for the app. If you choose "Allow", macOS signs the application and automatically adds it to the firewall list. If you choose "Deny", macOS adds it to the list but denies incoming connections intended for this app.
 
 After interacting with `socketfilterfw`, you may want to restart (or terminate) the process:
 
@@ -456,9 +461,9 @@ Programs such as [Little Snitch](https://www.obdev.at/products/littlesnitch/inde
 *Example of Little Snitch-monitored session*
 
 ```
-LittleSnitch-3.7.dmg
-SHA-256: 5c44d853dc4178fb227abd3e8eee19ef1bf0d576f49b5b6a9a7eddf6ae7ea951
-SHA-1:   1320ca9bcffb8ff8105b7365e792db6dc7b9f46a
+LittleSnitch-3.7.1.dmg
+SHA-256: e6332ee70385f459d9803b0a582d5344bb9dab28bcd56e247ae69866cc321802
+SHA-1:   d5d602c0f76cd73051792dff0ac334bbdc66ae32
 ```
 
 These programs are capable of monitoring and blocking **incoming** and **outgoing** network connections. However, they may require the use of a closed source [kernel extension](https://developer.apple.com/library/mac/documentation/Darwin/Conceptual/KernelProgramming/Extend/Extend.html).
@@ -558,7 +563,9 @@ Also disable **Bing Web Searches** in the Spotlight preferences to avoid your se
 
 See [fix-macosx.com](https://fix-macosx.com/) for detailed instructions.
 
-> If you've upgraded to Mac OS X Yosemite (10.10) and you're using the default settings, each time you start typing in Spotlight (to open an application or search for a file on your computer), your local search terms and location are sent to Apple and third parties (including Microsoft).
+> If you've upgraded to OS X 10.10 "Yosemite" and you're using the default settings, each time you start typing in Spotlight (to open an application or search for a file on your computer), your local search terms and location are sent to Apple and third parties (including Microsoft).
+
+ **Note** This Web site and instructions may no longer work on macOS Sierra - see [issue 164](https://github.com/drduh/macOS-Security-and-Privacy-Guide/issues/164).
 
 To download, view and apply their suggested fixes:
 
@@ -690,9 +697,9 @@ log-facility=/var/log/dnsmasq.log
 #dnssec-check-unsigned
 ```
 
-Install and start the program:
+Install and start the program (sudo is required to bind to [privileged port](https://unix.stackexchange.com/questions/16564/why-are-the-first-1024-ports-restricted-to-the-root-user-only) 53):
 
-    $ brew services start dnsmasq
+    $ sudo brew services start dnsmasq
 
 To set Dnsmasq as your local DNS server, open **System Preferences** > **Network** and select the active interface, then the **DNS** tab, select **+** and add `127.0.0.1`, or use:
 
@@ -1153,7 +1160,51 @@ $ hdiutil mount TorBrowser-6.0.5-osx64_en-US.dmg
 $ cp -rv /Volumes/Tor\ Browser/TorBrowser.app /Applications
 ```
 
-Tor traffic is **encrypted** to the [exit node](https://en.wikipedia.org/wiki/Tor_(anonymity_network)#Exit_node_eavesdropping) (cannot be read by a passive network eavesdropper), but Tor use **can** be identified - for example, TLS handshake "hostnames" will show up in plaintext:
+It is also possible to verify the Tor application's code signature was made by with The Tor Project's Apple developer ID **MADPSAYN6T**:
+
+```
+$ codesign -dvv /Applications/TorBrowser.app
+Executable=/Applications/TorBrowser.app/Contents/MacOS/firefox
+Identifier=org.mozilla.tor browser
+Format=app bundle with Mach-O thin (x86_64)
+CodeDirectory v=20200 size=247 flags=0x0(none) hashes=5+3 location=embedded
+Library validation warning=OS X SDK version before 10.9 does not support Library Validation
+Signature size=4247
+Authority=Developer ID Application: The Tor Project, Inc (MADPSAYN6T)
+Authority=Developer ID Certification Authority
+Authority=Apple Root CA
+Signed Time=Nov 30, 2016, 10:40:34 AM
+Info.plist entries=21
+TeamIdentifier=MADPSAYN6T
+Sealed Resources version=2 rules=12 files=130
+Internal requirements count=1 size=184
+```
+
+To view certificate details, extract it with `codesign` and decode it with `openssl`:
+
+```
+$ codesign -d --extract-certificates /Applications/TorBrowser.app
+Executable=/Applications/TorBrowser.app/Contents/MacOS/firefox
+
+$ file codesign*
+codesign0: data
+codesign1: data
+codesign2: data
+
+$ openssl x509 -inform der -in codesign0 -subject -issuer -startdate -enddate -noout
+subject= /UID=MADPSAYN6T/CN=Developer ID Application: The Tor Project, Inc (MADPSAYN6T)/OU=MADPSAYN6T/O=The Tor Project, Inc/C=US
+issuer= /CN=Developer ID Certification Authority/OU=Apple Certification Authority/O=Apple Inc./C=US
+notBefore=Apr 12 22:40:13 2016 GMT
+notAfter=Apr 13 22:40:13 2021 GMT
+
+$ openssl x509 -inform der -in codesign0  -fingerprint -noout
+SHA1 Fingerprint=95:80:54:F1:54:66:F3:9C:C2:D8:27:7A:29:21:D9:61:11:93:B3:E8
+
+$ openssl x509 -inform der -in codesign0 -fingerprint -sha256 -noout
+SHA256 Fingerprint=B5:0D:47:F0:3E:CB:42:B6:68:1C:6F:38:06:2B:C2:9F:41:FA:D6:54:F1:29:D3:E4:DD:9C:C7:49:35:FF:F5:D9
+```
+
+Tor traffic is **encrypted** to the [exit node](https://en.wikipedia.org/wiki/Tor_(anonymity_network)#Exit_node_eavesdropping) (i.e., cannot be read by a passive network eavesdropper), but Tor use **can** be identified - for example, TLS handshake "hostnames" will show up in plaintext:
 
 ```
 $ sudo tcpdump -An "tcp" | grep "www"
@@ -1187,6 +1238,8 @@ When choosing a VPN service or setting up your own, be sure to research the prot
 
 Some clients may send traffic over the next available interface when VPN is interrupted or disconnected. See [scy/8122924](https://gist.github.com/scy/8122924) for an example on how to allow traffic only over VPN.
 
+Another set of scripts to lock down your system so it will only access the internet via a VPN can be found as part of the Voodoo Privacy project - [sarfata/voodooprivacy](https://github.com/sarfata/voodooprivacy) and there is an updated guide to setting up an IPSec VPN on a virtual machine ([hwdsl2/setup-ipsec-vpn](https://github.com/hwdsl2/setup-ipsec-vpn)) or a docker container ([hwdsl2/docker-ipsec-vpn-server](https://github.com/hwdsl2/docker-ipsec-vpn-server)).
+
 ## Viruses and malware
 
 There is an [ever-increasing](https://www.documentcloud.org/documents/2459197-bit9-carbon-black-threat-research-report-2015.html) amount of Mac malware in the wild. Macs aren't immune from viruses and malicious software!
@@ -1195,7 +1248,7 @@ Some malware comes bundled with both legitimate software, such as the [Java bund
 
 See [Methods of malware persistence on Mac OS X](https://www.virusbtn.com/pdf/conference/vb2014/VB2014-Wardle.pdf) (pdf) and [Malware Persistence on OS X Yosemite](https://www.rsaconference.com/events/us15/agenda/sessions/1591/malware-persistence-on-os-x-yosemite) to learn about how garden-variety malware functions.
 
-You could periodically run a tool like [Knock Knock](https://github.com/synack/knockknock) to examine persistent applications (e.g. scripts, binaries). But by then, it is probably too late. Maybe applications such as [Block Block](https://objective-see.com/products/blockblock.html) and [Ostiarius](https://objective-see.com/products/ostiarius.html) will help. See warnings and caveats in [issue #90](https://github.com/drduh/OS-X-Security-and-Privacy-Guide/issues/90) first, however.  Using an application such as [Little Flocker] (https://github.com/jzdziarski/littleflocker) can also protect parts of the filesystem from unauthorized writes similar to how Little Snitch protects the network (note, however, the software is still in beta and should be [used with caution](https://github.com/drduh/OS-X-Security-and-Privacy-Guide/pull/128)).
+You could periodically run a tool like [Knock Knock](https://github.com/synack/knockknock) to examine persistent applications (e.g. scripts, binaries). But by then, it is probably too late. Maybe applications such as [Block Block](https://objective-see.com/products/blockblock.html) and [Ostiarius](https://objective-see.com/products/ostiarius.html) will help. See warnings and caveats in [issue #90](https://github.com/drduh/OS-X-Security-and-Privacy-Guide/issues/90) first, however.  Using an application such as [Little Flocker](https://www.littleflocker.com/) can also protect parts of the filesystem from unauthorized writes similar to how Little Snitch protects the network (note, however, the software is still in beta and should be [used with caution](https://github.com/drduh/OS-X-Security-and-Privacy-Guide/pull/128)).
 
 **Anti-virus** programs are a double-edged sword -- not useful for **advanced** users and will likely increase attack surface against sophisticated threats, however possibly useful for catching "garden variety" malware on **novice** users' Macs. There is also the additional processing overhead to consider.
 
@@ -1211,13 +1264,15 @@ Also check out [Hacking Team](https://www.schneier.com/blog/archives/2015/07/hac
 
 ## System Integrity Protection
 
-[System Integrity Protection](https://support.apple.com/en-us/HT204899) (SIP) is a new security feature of OS X 10.11. It is enabled by default, but [can be disabled](https://derflounder.wordpress.com/2015/10/01/system-integrity-protection-adding-another-layer-to-apples-security-model/), which may be necessary to change some system settings, such as deleting root certificate authorities or unloading certain launch daemons. Keep this feature on, as it is by default.
+[System Integrity Protection](https://support.apple.com/en-us/HT204899) (SIP) is a security feature since OS X 10.11 "El Capitan". It is enabled by default, but [can be disabled](https://derflounder.wordpress.com/2015/10/01/system-integrity-protection-adding-another-layer-to-apples-security-model/), which may be necessary to change some system settings, such as deleting root certificate authorities or unloading certain launch daemons. Keep this feature on, as it is by default.
 
 From [What's New in OS X 10.11](https://developer.apple.com/library/prerelease/mac/releasenotes/MacOSX/WhatsNewInOSX/Articles/MacOSX10_11.html):
 
 > A new security policy that applies to every running process, including privileged code and code that runs out of the sandbox. The policy extends additional protections to components on disk and at run-time, only allowing system binaries to be modified by the system installer and software updates. Code injection and runtime attachments to system binaries are no longer permitted.
 
 Also see [What is the “rootless” feature in El Capitan, really?](https://apple.stackexchange.com/questions/193368/what-is-the-rootless-feature-in-el-capitan-really)
+
+Some MacBook hardware has shipped with [SIP disabled](http://appleinsider.com/articles/16/11/17/system-integrity-protection-disabled-by-default-on-some-touch-bar-macbook-pros). To verify SIP is enabled, use the command `csrutil status`, which should return: `System Integrity Protection status: enabled.` Otherwise, [enable SIP](https://developer.apple.com/library/content/documentation/Security/Conceptual/System_Integrity_Protection_Guide/ConfiguringSystemIntegrityProtection/ConfiguringSystemIntegrityProtection.html) through Recovery Mode.
 
 ## Gatekeeper and XProtect
 
@@ -1353,7 +1408,7 @@ Finally, WEP protection on wireless networks is [not secure](http://www.howtogee
 
 For outgoing ssh connections, use hardware- or password-protected keys, [set up](http://nerderati.com/2011/03/17/simplify-your-life-with-an-ssh-config-file/) remote hosts and consider [hashing](http://nms.csail.mit.edu/projects/ssh/) them for added privacy.
 
-Here are several recommended [options](https://www.freebsd.org/cgi/man.cgi?query=ssh_config&sektion=5) to add to  `~/.ssh/ssh_config`:
+Here are several recommended [options](https://www.freebsd.org/cgi/man.cgi?query=ssh_config&sektion=5) to add to  `~/.ssh/config`:
 
     Host *
       PasswordAuthentication no
@@ -1500,7 +1555,214 @@ $ tshark -Y "ssl.handshake.certificate" -Tfields \
   -Eseparator=/s -Equote=d
 ```
 
-Also see the simple networking monitoring application [BonzaiThePenguin/Loading](https://github.com/BonzaiThePenguin/Loading)
+Also see the simple networking monitoring application [BonzaiThePenguin/Loading](https://github.com/BonzaiThePenguin/Loading).
+
+## Binary Whitelisting
+
+[google/santa](https://github.com/google/santa/) is a security software developed for Google's corporate Macintosh fleet and open sourced.
+
+> Santa is a binary whitelisting/blacklisting system for macOS. It consists of a kernel extension that monitors for executions, a userland daemon that makes execution decisions based on the contents of a SQLite database, a GUI agent that notifies the user in case of a block decision and a command-line utility for managing the system and synchronizing the database with a server.
+
+Santa uses the [Kernel Authorization API](https://developer.apple.com/library/content/technotes/tn2127/_index.html) to monitor and allow/disallow binaries from executing in the kernel. Binaries can be white- or black-listed by unique hash or signing developer certificate. Santa can be used to only allow trusted code execution, or to blacklist known malware from executing on a Mac, similar to Bit9 software for Windows.
+
+**Note** Santa does not currently have a graphical user interface for managing rules. The following instructions are for advanced users only!
+
+To install Santa, visit the [Releases](https://github.com/google/santa/releases) page and download the latest disk image, the mount it and install the contained package:
+
+```
+$ hdiutil mount ~/Downloads/santa-0.9.14.dmg
+
+$ sudo installer -pkg /Volumes/santa-0.9.14/santa-0.9.14.pkg -tgt /
+```
+
+By default, Santa installs in "Monitor" mode (meaning, nothing gets blocked, only logged) and comes with two rules: one for Apple binaries and another for Santa software itself.
+
+Verify Santa is running and its kernel module is loaded:
+
+```
+$ santactl status
+>>> Daemon Info
+  Mode                   | Monitor
+  File Logging           | No
+  Watchdog CPU Events    | 0  (Peak: 0.00%)
+  Watchdog RAM Events    | 0  (Peak: 0.00MB)
+>>> Kernel Info
+  Kernel cache count     | 0
+>>> Database Info
+  Binary Rules           | 0
+  Certificate Rules      | 2
+  Events Pending Upload  | 0
+
+$ ps -ef | grep "[s]anta"
+    0   786     1   0 10:01AM ??         0:00.39 /Library/Extensions/santa-driver.kext/Contents/MacOS/santad --syslog
+
+$ kextstat | grep santa
+  119    0 0xffffff7f822ff000 0x6000     0x6000     com.google.santa-driver (0.9.14) 693D8E4D-3161-30E0-B83D-66A273CAE026 <5 4 3 1>
+```
+
+Create a blacklist rule to prevent iTunes from executing:
+
+    $ sudo santactl rule --blacklist --path /Applications/iTunes.app/
+    Added rule for SHA-256: e1365b51d2cb2c8562e7f1de36bfb3d5248de586f40b23a2ed641af2072225b3.
+
+Try to launch iTunes - it will be blocked.
+
+    $ open /Applications/iTunes.app/
+    LSOpenURLsWithRole() failed with error -10810 for the file /Applications/iTunes.app.
+
+<img width="450" alt="Santa block dialog when attempting to run a blacklisted program" src="https://cloud.githubusercontent.com/assets/12475110/21062284/14ddde88-be1e-11e6-8e9b-32f8a44c0cf6.png">
+
+To remove the rule:
+
+    $ sudo santactl rule --remove --path /Applications/iTunes.app/
+    Removed rule for SHA-256: e1365b51d2cb2c8562e7f1de36bfb3d5248de586f40b23a2ed641af2072225b3.
+
+Open iTunes:
+
+    $ open /Applications/iTunes.app/
+    [iTunes will open successfully]
+
+Create a new, example C program:
+
+```
+$ cat <<EOF > foo.c
+> #include <stdio.h>
+> main() { printf("Hello World\n”); }
+> EOF
+```
+
+Compile the program with GCC (requires installation of Xcode or command-line tools):
+
+```
+$ gcc -o foo foo.c
+
+$ file foo
+foo: Mach-O 64-bit executable x86_64
+
+$ codesign -d foo
+foo: code object is not signed at all
+```
+
+Run it:
+
+```
+$ ./foo
+Hello World
+```
+
+Toggle Santa into “Lockdown” mode, which only allows whitelisted binaries to run:
+
+    $ sudo defaults write /var/db/santa/config.plist ClientMode -int 2
+
+Try to run the unsigned binary:
+
+```
+$ ./foo
+bash: ./foo: Operation not permitted
+
+Santa
+
+The following application has been blocked from executing
+because its trustworthiness cannot be determined.
+
+Path:       /Users/demouser/foo
+Identifier: 4e11da26feb48231d6e90b10c169b0f8ae1080f36c168ffe53b1616f7505baed
+Parent:     bash (701)
+```
+To whitelist a specific binary, determine its SHA-256 sum:
+
+```
+$ santactl fileinfo /Users/demouser/foo
+Path                 : /Users/demouser/foo
+SHA-256              : 4e11da26feb48231d6e90b10c169b0f8ae1080f36c168ffe53b1616f7505baed
+SHA-1                : 4506f3a8c0a5abe4cacb98e6267549a4d8734d82
+Type                 : Executable (x86-64)
+Code-signed          : No
+Rule                 : Blacklisted (Unknown)
+```
+
+Add a whitelist rule:
+
+    $ sudo santactl rule --whitelist --sha256 4e11da26feb48231d6e90b10c169b0f8ae1080f36c168ffe53b1616f7505baed
+    Added rule for SHA-256: 4e11da26feb48231d6e90b10c169b0f8ae1080f36c168ffe53b1616f7505baed.
+
+Run it:
+
+```
+$ ./foo 
+Hello World
+```
+
+It's allowed and works!
+
+Applications can also be whitelisted by developer certificate (so that new binary versions will not need to be manually whitelisted on each update). For example, download and run Google Chrome - it will be blocked by Santa in "Lockdown" mode:
+
+```
+$ curl -sO https://dl.google.com/chrome/mac/stable/GGRO/googlechrome.dmg
+
+$ hdiutil mount googlechrome.dmg 
+
+$ cp -r /Volumes/Google\ Chrome/Google\ Chrome.app /Applications/
+
+$ open /Applications/Google\ Chrome.app/
+LSOpenURLsWithRole() failed with error -10810 for the file /Applications/Google Chrome.app.
+```
+
+Whitelist the application by its developer certificate (first item in the Signing Chain):
+
+```
+$ santactl fileinfo /Applications/Google\ Chrome.app/
+Path                 : /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+SHA-256              : 0eb08224d427fb1d87d2276d911bbb6c4326ec9f74448a4d9a3cfce0c3413810
+SHA-1                : 9213cbc7dfaaf7580f3936a915faa56d40479f6a
+Bundle Name          : Google Chrome
+Bundle Version       : 2883.87
+Bundle Version Str   : 55.0.2883.87
+Type                 : Executable (x86-64)
+Code-signed          : Yes
+Rule                 : Blacklisted (Unknown)
+Signing Chain:
+     1. SHA-256             : 15b8ce88e10f04c88a5542234fbdfc1487e9c2f64058a05027c7c34fc4201153
+        SHA-1               : 85cee8254216185620ddc8851c7a9fc4dfe120ef
+        Common Name         : Developer ID Application: Google Inc.
+        Organization        : Google Inc.
+        Organizational Unit : EQHXZ8M8AV
+        Valid From          : 2012/04/26 07:10:10 -0700
+        Valid Until         : 2017/04/27 07:10:10 -0700
+
+     2. SHA-256             : 7afc9d01a62f03a2de9637936d4afe68090d2de18d03f29c88cfb0b1ba63587f
+        SHA-1               : 3b166c3b7dc4b751c9fe2afab9135641e388e186
+        Common Name         : Developer ID Certification Authority
+        Organization        : Apple Inc.
+        Organizational Unit : Apple Certification Authority
+        Valid From          : 2012/02/01 14:12:15 -0800
+        Valid Until         : 2027/02/01 14:12:15 -0800
+
+     3. SHA-256             : b0b1730ecbc7ff4505142c49f1295e6eda6bcaed7e2c68c5be91b5a11001f024
+        SHA-1               : 611e5b662c593a08ff58d14ae22452d198df6c60
+        Common Name         : Apple Root CA
+        Organization        : Apple Inc.
+        Organizational Unit : Apple Certification Authority
+        Valid From          : 2006/04/25 14:40:36 -0700
+        Valid Until         : 2035/02/09 13:40:36 -0800
+```
+
+In this case, `15b8ce88e10f04c88a5542234fbdfc1487e9c2f64058a05027c7c34fc4201153` is the SHA-256 of Google’s Apple developer certificate (team ID EQHXZ8M8AV). To whitelist it:
+
+```
+$ sudo santactl rule --whitelist --certificate --sha256 15b8ce88e10f04c88a5542234fbdfc1487e9c2f64058a05027c7c34fc4201153
+Added rule for SHA-256: 15b8ce88e10f04c88a5542234fbdfc1487e9c2f64058a05027c7c34fc4201153.
+```
+
+Google Chrome should now launch, and subsequent updates to the application will continue to work as long as the code signing certificate doesn’t change or expire.
+
+To disable “Lockdown” mode:
+
+    $ sudo defaults delete /var/db/santa/config.plist ClientMode
+
+See `/var/log/santa.log` to monitor ALLOW and DENY execution decisions.
+
+**Note** Python, Bash and other interpreters are whitelisted (since they are signed by Apple's developer certificate), so Santa will not be able to block such scripts from executing. Thus, a potential non-binary program which disables Santa is a weakness (not vulnerability, since it is so by design) to take note of.
 
 ## Miscellaneous
 
@@ -1564,7 +1826,7 @@ Did you know Apple has not shipped a computer with TPM since [2006](http://osxbo
 
 ## Related software
 
-[Santa](https://github.com/google/santa/) - A binary whitelisting/blacklisting system for Mac OS X.
+[Santa](https://github.com/google/santa/) - A binary whitelisting/blacklisting system for macOS.
 
 [kristovatlas/osx-config-check](https://github.com/kristovatlas/osx-config-check) - checks your OSX machine against various hardened configuration settings.
 
@@ -1589,6 +1851,8 @@ Did you know Apple has not shipped a computer with TPM since [2006](http://osxbo
 ## Additional resources
 
 *In no particular order*
+
+[MacOS Hardening Guide - Appendix of \*OS Internals: Volume III - Security & Insecurity Internals](http://newosxbook.com/files/moxii3/AppendixA.pdf)
 
 [Mac Developer Library: Secure Coding Guide](https://developer.apple.com/library/mac/documentation/Security/Conceptual/SecureCodingGuide/Introduction.html)
 
@@ -1624,6 +1888,8 @@ Did you know Apple has not shipped a computer with TPM since [2006](http://osxbo
 
 [Hacker News discussion](https://news.ycombinator.com/item?id=10148077)
 
+[Hacker News discussion 2](https://news.ycombinator.com/item?id=13023823)
+
 [Apple Open Source](https://opensource.apple.com/)
 
 [OS X 10.10 Yosemite: The Ars Technica Review](http://arstechnica.com/apple/2014/10/os-x-10-10/)
@@ -1655,3 +1921,6 @@ Did you know Apple has not shipped a computer with TPM since [2006](http://osxbo
 [Auditing and Exploiting Apple IPC](https://googleprojectzero.blogspot.com/2015/09/revisiting-apple-ipc-1-distributed_28.html)
 
 [Mac OS X and iOS Internals: To the Apple's Core by Jonathan Levin](https://www.amazon.com/Mac-OS-iOS-Internals-Apples/dp/1118057651)
+
+[Demystifying the i-Device NVMe NAND (New storage used by Apple)](http://ramtin-amin.fr/#nvmepcie)
+
