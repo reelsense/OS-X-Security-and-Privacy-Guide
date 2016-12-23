@@ -8,6 +8,8 @@ I am **not** responsible if you break a Mac by following any of these steps.
 
 If you wish to make a correction or improvement, please send a pull request or [open an issue](https://github.com/drduh/OS-X-Security-and-Privacy-Guide/issues).
 
+This guide is also available in [简体中文](https://github.com/xitu/macOS-Security-and-Privacy-Guide/blob/master/README-cn.md).
+
 - [Basics](#basics)
 - [Firmware](#firmware)
 - [Preparing and Installing macOS](#preparing-and-installing-macos)
@@ -105,7 +107,11 @@ This feature [can be helpful if your laptop is stolen](https://www.ftc.gov/news-
 
 The firmware password will activate at next boot. To validate the password, hold `Alt` during boot - you should be prompted to enter the password.
 
-The firmware password can also be managed with the `firmwarepasswd` utility while booted into the OS.
+The firmware password can also be managed with the `firmwarepasswd` utility while booted into the OS. For example, to prompt for the firmware password when attempting to boot from a different volume:
+
+    $ sudo firmwarepasswd -setpasswd -setmode command
+
+Enter a password and reboot.
 
 <img width="750" alt="Using a Dediprog SF600 to dump and flash a 2013 MacBook SPI Flash chip to remove a firmware password, sans Apple" src="https://cloud.githubusercontent.com/assets/12475110/17075918/0f851c0c-50e7-11e6-904d-0b56cf0080c1.png">
 
@@ -357,16 +363,27 @@ It is not strictly required to ever log into the admin account via the macOS log
 
 #### Setup
 
-Accounts can be created and managed in System Preferences. On settled systems, it is generally easier to create a second admin account and then demote the first account. This avoids data migration. Newly installed systems can also just add a standard account. Demoting an account can be done either from the the new admin account in System Preferences – the other account must be logged out – or by executing this command:
+Accounts can be created and managed in System Preferences. On settled systems, it is generally easier to create a second admin account and then demote the first account. This avoids data migration. Newly installed systems can also just add a standard account. Demoting an account can be done either from the the new admin account in System Preferences – the other account must be logged out – or by executing these commands (it may not be necessary to execute both, see [issue #179](https://github.com/drduh/macOS-Security-and-Privacy-Guide/issues/179)):
+
 ```
-sudo dscl . -delete /Groups/admin GroupMembership user_name
+$ sudo dscl . -delete /Groups/admin GroupMembership <username>
+
+$ sudo dscl . -delete /Groups/admin GroupMembers <GeneratedUID>
 ```
+
+You can find the “GeneratedUID” of your account with:
+
+```
+$ dscl . -read /Users/<username> GeneratedUID
+```
+
+See also [this post](https://superuser.com/a/395738) for more information about how macOS determines group membership.
 
 ## Full disk encryption
 
 [FileVault](https://en.wikipedia.org/wiki/FileVault) provides full disk (technically, full _volume_) encryption on macOS.
 
-FileVault encryption will protect data at rest and prevent someone with physical access from stealing data or tampering with your Mac.
+FileVault encryption protects data at rest and hardens (but [not always prevents](http://blog.frizk.net/2016/12/filevault-password-retrieval.html)) someone with physical access from stealing data or tampering with your Mac.
 
 With much of the cryptographic operations happening [efficiently in hardware](https://software.intel.com/en-us/articles/intel-advanced-encryption-standard-aes-instructions-set/), the performance penalty for FileVault is not noticeable.
 
@@ -470,7 +487,7 @@ These programs are capable of monitoring and blocking **incoming** and **outgoin
 
 If the number of choices of allowing/blocking network connections is overwhelming, use **Silent Mode** with connections allowed, then periodically check your settings to gain understanding of what various applications are doing.
 
-It is worth noting that these firewalls can be bypassed by programs running as **root** or through [OS vulnerabilities](https://www.blackhat.com/docs/us-15/materials/us-15-Wardle-Writing-Bad-A-Malware-For-OS-X.pdf) (pdf), but they are still worth having - just don't expect absolute protection.
+It is worth noting that these firewalls can be bypassed by programs running as **root** or through [OS vulnerabilities](https://www.blackhat.com/docs/us-15/materials/us-15-Wardle-Writing-Bad-A-Malware-For-OS-X.pdf) (pdf), but they are still worth having - just don't expect absolute protection. However, some malware actually [deletes itself](https://www.cnet.com/how-to/how-to-remove-the-flashback-malware-from-os-x/) and doesn't execute if Little Snitch, or other security software, is installed.
 
 For more on how Little Snitch works, see the [Network Kernel Extensions Programming Guide](https://developer.apple.com/library/mac/documentation/Darwin/Conceptual/NKEConceptual/socket_nke/socket_nke.html#//apple_ref/doc/uid/TP40001858-CH228-SW1) and [Shut up snitch! – reverse engineering and exploiting a critical Little Snitch vulnerability](https://reverse.put.as/2016/07/22/shut-up-snitch-reverse-engineering-and-exploiting-a-critical-little-snitch-vulnerability/).
 
@@ -1293,33 +1310,76 @@ See [here](http://www.zoharbabin.com/hey-mac-i-dont-appreciate-you-spying-on-me-
 To permanently disable this feature, [clear the file](https://superuser.com/questions/90008/how-to-clear-the-contents-of-a-file-from-the-command-line) and [make it immutable](http://hints.macworld.com/article.php?story=20031017061722471):
 
     $ :>~/Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2
+
     $ sudo chflags schg ~/Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2
 
-Furthermore, macOS attaches metadata ([HFS+ extended attributes](https://en.wikipedia.org/wiki/Extended_file_attributes#OS_X)) to downloaded files:
+Furthermore, macOS attaches metadata ([HFS+ extended attributes](https://en.wikipedia.org/wiki/Extended_file_attributes#OS_X)) to downloaded files, which can be viewed with the `mdls` and `xattr` commands:
 
 ```
-$ ls -l@ ~/Downloads/TorBrowser-6.0.5-osx64_en-US.dmg
--rw-r--r--@ 1 drduh  staff  59322237 Oct  9 15:20 TorBrowser-6.0.5-osx64_en-US.dmg
+$ ls -l@ ~/Downloads/TorBrowser-6.0.8-osx64_en-US.dmg
+-rw-r--r--@ 1 drduh  staff  59322237 Dec  1 12:00 TorBrowser-6.0.8-osx64_en-US.dmg
 com.apple.metadata:kMDItemWhereFroms	     186
 com.apple.quarantine	      68
 
-$ xattr -l ~/Downloads/TorBrowser-6.0.5-osx64_en-US.dmg
-com.apple.metadata:kMDItemWhereFroms:
-00000000  62 70 6C 69 73 74 30 30 A2 01 02 5F 10 4D 68 74  |bplist00..._.Mht|
-00000010  74 70 73 3A 2F 2F 64 69 73 74 2E 74 6F 72 70 72  |tps://dist.torpr|
-00000020  6F 6A 65 63 74 2E 6F 72 67 2F 74 6F 72 62 72 6F  |oject.org/torbro|
-00000030  77 73 65 72 2F 36 2E 30 2E 35 2F 54 6F 72 42 72  |wser/6.0.5/TorBr|
-00000040  6F 77 73 65 72 2D 36 2E 30 2E 35 2D 6F 73 78 36  |owser-6.0.5-osx6|
-00000050  34 5F 65 6E 2D 55 53 2E 64 6D 67 5F 10 39 68 74  |4_en-US.dmg_.9ht|
-00000060  74 70 73 3A 2F 2F 77 77 77 2E 74 6F 72 70 72 6F  |tps://www.torpro|
-00000070  6A 65 63 74 2E 6F 72 67 2F 64 6F 77 6E 6C 6F 61  |ject.org/downloa|
-00000080  64 2F 64 6F 77 6E 6C 6F 61 64 2D 65 61 73 79 2E  |d/download-easy.|
-00000090  68 74 6D 6C 2E 65 6E 08 0B 5B 00 00 00 00 00 00  |html.en..[......|
-000000A0  01 01 00 00 00 00 00 00 00 03 00 00 00 00 00 00  |................|
-000000B0  00 00 00 00 00 00 00 00 00 97                    |..........|
-000000ba
-com.apple.quarantine: 0081;52fb9173;Google Chrome.app;3AB6D46E-4AC5-3C3E-B427-32C7F804AAA3
+$ mdls ~/Downloads/TorBrowser-6.0.8-osx64_en-US.dmg
+_kMDItemOwnerUserID            = 501
+kMDItemContentCreationDate     = 2016-12-01 12:00:00 +0000
+kMDItemContentModificationDate = 2016-12-01 12:00:00 +0000
+kMDItemContentType             = "com.apple.disk-image-udif"
+kMDItemContentTypeTree         = (
+    "public.archive",
+    "public.item",
+    "public.data",
+    "public.disk-image",
+    "com.apple.disk-image",
+    "com.apple.disk-image-udif"
+)
+kMDItemDateAdded               = 2016-12-01 12:00:00 +0000
+kMDItemDisplayName             = "TorBrowser-6.0.8-osx64_en-US.dmg"
+kMDItemFSContentChangeDate     = 2016-12-01 12:00:00 +0000
+kMDItemFSCreationDate          = 2016-12-01 12:00:00 +0000
+kMDItemFSCreatorCode           = ""
+kMDItemFSFinderFlags           = 0
+kMDItemFSHasCustomIcon         = (null)
+kMDItemFSInvisible             = 0
+kMDItemFSIsExtensionHidden     = 0
+kMDItemFSIsStationery          = (null)
+kMDItemFSLabel                 = 0
+kMDItemFSName                  = "TorBrowser-6.0.8-osx64_en-US.dmg"
+kMDItemFSNodeCount             = (null)
+kMDItemFSOwnerGroupID          = 5000
+kMDItemFSOwnerUserID           = 501
+kMDItemFSSize                  = 60273898
+kMDItemFSTypeCode              = ""
+kMDItemKind                    = "Disk Image"
+kMDItemLogicalSize             = 60273898
+kMDItemPhysicalSize            = 60276736
+kMDItemWhereFroms              = (
+    "https://dist.torproject.org/torbrowser/6.0.8/TorBrowser-6.0.8-osx64_en-US.dmg",
+    "https://www.torproject.org/projects/torbrowser.html.en"
+)
 
+$ xattr -l TorBrowser-6.0.8-osx64_en-US.dmg
+com.apple.metadata:kMDItemWhereFroms:
+00000000  62 70 6C 69 73 74 30 30 A2 01 02 5F 10 4D 68 74  |bplist00..._.Mht|
+00000010  74 70 73 3A 2F 2F 64 69 73 74 2E 74 6F 72 70 72  |tps://dist.torpr|
+00000020  6F 6A 65 63 74 2E 6F 72 67 2F 74 6F 72 62 72 6F  |oject.org/torbro|
+00000030  77 73 65 72 2F 36 2E 30 2E 38 2F 54 6F 72 42 72  |wser/6.0.8/TorBr|
+00000040  6F 77 73 65 72 2D 36 2E 30 2E 38 2D 6F 73 78 36  |owser-6.0.8-osx6|
+00000050  34 5F 65 6E 2D 55 53 2E 64 6D 67 5F 10 36 68 74  |4_en-US.dmg_.6ht|
+00000060  74 70 73 3A 2F 2F 77 77 77 2E 74 6F 72 70 72 6F  |tps://www.torpro|
+00000070  6A 65 63 74 2E 6F 72 67 2F 70 72 6F 6A 65 63 74  |ject.org/project|
+00000080  73 2F 74 6F 72 62 72 6F 77 73 65 72 2E 68 74 6D  |s/torbrowser.htm|
+00000090  6C 2E 65 6E 08 0B 5B 00 00 00 00 00 00 01 01 00  |l.en..[.........|
+000000A0  00 00 00 00 00 00 03 00 00 00 00 00 00 00 00 00  |................|
+000000B0  00 00 00 00 00 00 94                             |.......|
+000000b7
+com.apple.quarantine: 0081;58519ffa;Google Chrome.app;1F032CAB-F5A1-4D92-84EB-CBECA971B7BC
+```
+
+Metadata attributes can also be removed with the `-d` flag:
+
+```
 $ xattr -d com.apple.metadata:kMDItemWhereFroms ~/Downloads/TorBrowser-6.0.5-osx64_en-US.dmg
 
 $ xattr -d com.apple.quarantine ~/Downloads/TorBrowser-6.0.5-osx64_en-US.dmg
@@ -1689,7 +1749,7 @@ Add a whitelist rule:
 Run it:
 
 ```
-$ ./foo 
+$ ./foo
 Hello World
 ```
 
@@ -1700,7 +1760,7 @@ Applications can also be whitelisted by developer certificate (so that new binar
 ```
 $ curl -sO https://dl.google.com/chrome/mac/stable/GGRO/googlechrome.dmg
 
-$ hdiutil mount googlechrome.dmg 
+$ hdiutil mount googlechrome.dmg
 
 $ cp -r /Volumes/Google\ Chrome/Google\ Chrome.app /Applications/
 
@@ -1852,11 +1912,11 @@ Did you know Apple has not shipped a computer with TPM since [2006](http://osxbo
 
 *In no particular order*
 
-[MacOS Hardening Guide - Appendix of \*OS Internals: Volume III - Security & Insecurity Internals](http://newosxbook.com/files/moxii3/AppendixA.pdf)
+[MacOS Hardening Guide - Appendix of \*OS Internals: Volume III - Security & Insecurity Internals](http://newosxbook.com/files/moxii3/AppendixA.pdf) (pdf)
 
 [Mac Developer Library: Secure Coding Guide](https://developer.apple.com/library/mac/documentation/Security/Conceptual/SecureCodingGuide/Introduction.html)
 
-[OS X Core Technologies Overview White Paper](https://www.apple.com/osx/all-features/pdf/osx_elcapitan_core_technologies_overview.pdf)
+[OS X Core Technologies Overview White Paper](https://www.apple.com/osx/all-features/pdf/osx_elcapitan_core_technologies_overview.pdf) (pdf)
 
 [Reverse Engineering Mac OS X blog](https://reverse.put.as/)
 
@@ -1923,4 +1983,3 @@ Did you know Apple has not shipped a computer with TPM since [2006](http://osxbo
 [Mac OS X and iOS Internals: To the Apple's Core by Jonathan Levin](https://www.amazon.com/Mac-OS-iOS-Internals-Apples/dp/1118057651)
 
 [Demystifying the i-Device NVMe NAND (New storage used by Apple)](http://ramtin-amin.fr/#nvmepcie)
-
