@@ -868,7 +868,7 @@ If you're going to use OpenSSL on your Mac, download and install a recent versio
 Compare the TLS protocol and cipher between the homebrew version and the system version of OpenSSL:
 
 ```
-$ ~/homebrew/bin/openssl version; echo | ~/homebrew/bin openssl s_client -connect github.com:443 2>&1 | grep -A2 SSL-Session
+$ ~/homebrew/bin/openssl version; echo | ~/homebrew/bin/openssl s_client -connect github.com:443 2>&1 | grep -A2 SSL-Session
 OpenSSL 1.0.2j  26 Sep 2016
 SSL-Session:
     Protocol  : TLSv1.2
@@ -1271,7 +1271,7 @@ You could periodically run a tool like [Knock Knock](https://github.com/synack/k
 
 See [Sophail: Applied attacks against  Antivirus](https://lock.cmpxchg8b.com/sophailv2.pdf) (pdf), [Analysis and Exploitation of an ESET Vulnerability](http://googleprojectzero.blogspot.ro/2015/06/analysis-and-exploitation-of-eset.html), [a trivial Avast RCE](https://code.google.com/p/google-security-research/issues/detail?id=546), [Popular Security Software Came Under Relentless NSA and GCHQ Attacks](https://theintercept.com/2015/06/22/nsa-gchq-targeted-kaspersky/), and [AVG: "Web TuneUP" extension multiple critical vulnerabilities](https://code.google.com/p/google-security-research/issues/detail?id=675).
 
-Therefore, the best anti-virus is **Common Sense 2016**. See more discussion in [issue #44](https://github.com/drduh/OS-X-Security-and-Privacy-Guide/issues/44).
+Therefore, the best anti-virus is **Common Sense 2017**. See more discussion in [issue #44](https://github.com/drduh/OS-X-Security-and-Privacy-Guide/issues/44).
 
 Local privilege escalation bugs are plenty on macOS, so always be careful when downloading and running untrusted programs or trusted programs from third party websites or downloaded over HTTP ([example](http://arstechnica.com/security/2015/08/0-day-bug-in-fully-patched-os-x-comes-under-active-exploit-to-hijack-macs/)).
 
