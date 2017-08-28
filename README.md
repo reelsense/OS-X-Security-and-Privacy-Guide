@@ -131,7 +131,25 @@ The simplest way is to boot into [Recovery Mode](https://support.apple.com/en-us
 
 Another way is to download **macOS Sierra** from the [App Store](https://itunes.apple.com/us/app/macos-sierra/id1127487414) or some other place and create a custom, installable system image.
 
-The macOS Sierra installer application is [code signed](https://developer.apple.com/library/mac/documentation/Security/Conceptual/CodeSigningGuide/Procedures/Procedures.html#//apple_ref/doc/uid/TP40005929-CH4-SW6), which should be verified to make sure you received a legitimate copy, using the `codesign` command:
+The macOS Sierra installer application is [code signed](https://developer.apple.com/library/mac/documentation/Security/Conceptual/CodeSigningGuide/Procedures/Procedures.html#//apple_ref/doc/uid/TP40005929-CH4-SW6), which should be verified to make sure you received a legitimate copy, using the `spctl -a -v` or `pkgutil --check-signature` commands:
+
+```
+$ pkgutil --check-signature /Applications/Install\ macOS\ Sierra.app
+Package "Install macOS Sierra.app":
+   Status: signed by a certificate trusted by Mac OS X
+   Certificate Chain:
+    1. Apple Mac OS Application Signing
+       SHA1 fingerprint: B9 3B DA AA F1 A8 84 6B 34 BA 32 33 26 35 CB 2B 84 85 3D A8
+       -----------------------------------------------------------------------------
+    2. Apple Worldwide Developer Relations Certification Authority
+       SHA1 fingerprint: FF 67 97 79 3A 3C D7 98 DC 5B 2A BE F5 6F 73 ED C9 F8 3A 64
+       -----------------------------------------------------------------------------
+    3. Apple Root CA
+       SHA1 fingerprint: 61 1E 5B 66 2C 59 3A 08 FF 58 D1 4A E2 24 52 D1 98 DF 6C 60
+
+```
+
+You may also use the `codesign` command to examine an application's code signature:
 
 ```
 $ codesign -dvv /Applications/Install\ macOS\ Sierra.app
@@ -387,7 +405,7 @@ FileVault encryption protects data at rest and hardens (but [not always prevents
 
 With much of the cryptographic operations happening [efficiently in hardware](https://software.intel.com/en-us/articles/intel-advanced-encryption-standard-aes-instructions-set/), the performance penalty for FileVault is not noticeable.
 
-The security of FileVault greatly depends on the pseudo random number generator (PRNG).
+Like all cryptosystems, the security of FileVault greatly depends on the quality of the pseudo random number generator (PRNG).
 
 > The random device implements the Yarrow pseudo random number generator algorithm and maintains its entropy pool.  Additional entropy is fed to the generator regularly by the SecurityServer daemon from random jitter measurements of the kernel.
 
@@ -395,7 +413,9 @@ The security of FileVault greatly depends on the pseudo random number generator 
 
 See `man 4 random` for more information.
 
-The PRNG can be manually seeded with entropy by writing to /dev/random **before** enabling FileVault. This can be done by simply using the Mac for a little while before activating FileVault.
+Turning on FileVault in System Preferences **after** installing macOS, rather than creating an encrypted partition for the installation first, is [more secure](https://github.com/drduh/macOS-Security-and-Privacy-Guide/issues/230), because more PRNG entropy is available then.
+
+Additionally, the PRNG can be manually seeded with entropy by writing to /dev/random **before** enabling FileVault. This can be done by simply using the Mac for a little while before activating FileVault.
 
 To manually seed entropy *before* enabling FileVault:
 
@@ -913,7 +933,9 @@ ipv4
 
 Consider using [Privoxy](http://www.privoxy.org/) as a local proxy to filter Web browsing traffic.
 
-A signed installation package for privoxy can be downloaded from [silvester.org.uk](http://silvester.org.uk/privoxy/OSX/) or [Sourceforge](http://sourceforge.net/projects/ijbswa/files/Macintosh%20%28OS%20X%29/). The signed package is [more secure](https://github.com/drduh/OS-X-Security-and-Privacy-Guide/issues/65) than the Homebrew version, and attracts full support from the Privoxy project.
+**Note** macOS proxy settings are not universal; apps and services may or may not honor system proxy settings. Ensure the app you wish to proxy is correctly configured and manually verify connections don't leak. Additionally, it may be possible to configure the *pf* firewall to transparently proxy all traffic.
+
+A signed installation package for privoxy can be downloaded from [silvester.org.uk](https://silvester.org.uk/privoxy/OSX/) or [Sourceforge](https://sourceforge.net/projects/ijbswa/files/Macintosh%20%28OS%20X%29/). The signed package is [more secure](https://github.com/drduh/OS-X-Security-and-Privacy-Guide/issues/65) than the Homebrew version, and attracts full support from the Privoxy project.
 
 Alternatively, install and start privoxy using Homebrew:
 
@@ -923,11 +945,11 @@ Alternatively, install and start privoxy using Homebrew:
 
 By default, privoxy listens on local TCP port 8118.
 
-Set the system **http** proxy for your active network interface `127.0.0.1` and `8118` (This can be done through **System Preferences > Network > Advanced > Proxies**):
+Set the system **HTTP** proxy for your active network interface `127.0.0.1` and `8118` (This can be done through **System Preferences > Network > Advanced > Proxies**):
 
     $ sudo networksetup -setwebproxy "Wi-Fi" 127.0.0.1 8118
 
-**(Optional)** Set the system **https** proxy, which still allows for domain name filtering, with:
+**(Optional)** Set the system **HTTPS** proxy, which still allows for domain name filtering, with:
 
     $ sudo networksetup -setsecurewebproxy "Wi-Fi" 127.0.0.1 8118
 
@@ -1170,27 +1192,49 @@ $ hdiutil mount TorBrowser-6.0.5-osx64_en-US.dmg
 $ cp -rv /Volumes/Tor\ Browser/TorBrowser.app /Applications
 ```
 
-It is also possible to verify the Tor application's code signature was made by with The Tor Project's Apple developer ID **MADPSAYN6T**:
+Verify the Tor application's code signature was made by with The Tor Project's Apple developer ID **MADPSAYN6T**, using the `spctl -a -v` and/or `pkgutil --check-signature` commands:
+
+```
+$ spctl -a -vv /Applications/TorBrowser.app
+/Applications/TorBrowser.app: accepted
+source=Developer ID
+origin=Developer ID Application: The Tor Project, Inc (MADPSAYN6T)
+
+$ pkgutil --check-signature /Applications/TorBrowser.app
+Package "TorBrowser.app":
+   Status: signed by a certificate trusted by Mac OS X
+   Certificate Chain:
+    1. Developer ID Application: The Tor Project, Inc (MADPSAYN6T)
+       SHA1 fingerprint: 95 80 54 F1 54 66 F3 9C C2 D8 27 7A 29 21 D9 61 11 93 B3 E8
+       -----------------------------------------------------------------------------
+    2. Developer ID Certification Authority
+       SHA1 fingerprint: 3B 16 6C 3B 7D C4 B7 51 C9 FE 2A FA B9 13 56 41 E3 88 E1 86
+       -----------------------------------------------------------------------------
+    3. Apple Root CA
+       SHA1 fingerprint: 61 1E 5B 66 2C 59 3A 08 FF 58 D1 4A E2 24 52 D1 98 DF 6C 60
+```
+
+You may also use the `codesign` command to examine an application's code signature:
 
 ```
 $ codesign -dvv /Applications/TorBrowser.app
 Executable=/Applications/TorBrowser.app/Contents/MacOS/firefox
-Identifier=org.mozilla.tor browser
+Identifier=org.torproject.torbrowser
 Format=app bundle with Mach-O thin (x86_64)
-CodeDirectory v=20200 size=247 flags=0x0(none) hashes=5+3 location=embedded
+CodeDirectory v=20200 size=249 flags=0x0(none) hashes=5+3 location=embedded
 Library validation warning=OS X SDK version before 10.9 does not support Library Validation
 Signature size=4247
 Authority=Developer ID Application: The Tor Project, Inc (MADPSAYN6T)
 Authority=Developer ID Certification Authority
 Authority=Apple Root CA
-Signed Time=Nov 30, 2016, 10:40:34 AM
-Info.plist entries=21
+Signed Time=Aug 7, 2017, 1:43:17 AM
+Info.plist entries=22
 TeamIdentifier=MADPSAYN6T
 Sealed Resources version=2 rules=12 files=130
-Internal requirements count=1 size=184
+Internal requirements count=1 size=188
 ```
 
-To view certificate details, extract it with `codesign` and decode it with `openssl`:
+To view full certificate details, extract them with `codesign` and decode it with `openssl`:
 
 ```
 $ codesign -d --extract-certificates /Applications/TorBrowser.app
