@@ -48,6 +48,7 @@ This guide is also available in [简体中文](https://github.com/xitu/macOS-Sec
 - [Viruses and malware](#viruses-and-malware)
 - [System Integrity Protection](#system-integrity-protection)
 - [Gatekeeper and XProtect](#gatekeeper-and-xprotect)
+- [Metadata and artifacts](#metadata-and-artifacts)
 - [Passwords](#passwords)
 - [Backup](#backup)
 - [Wi-Fi](#wi-fi)
@@ -523,7 +524,7 @@ pf can also be controlled with a GUI application such as [IceFloor](http://www.h
 
 There are many books and articles on the subject of pf firewall. Here's is just one example of blocking traffic by IP address.
 
-Add the following into a file called `pf.rules`:
+Add the following into a file called `pf.rules`, modifying `en0` to be your outbound network adapter:
 
 ```
 set block-policy drop
@@ -536,21 +537,67 @@ block in log
 block in log quick from no-route to any
 pass out proto tcp from any to any keep state
 pass out proto udp from any to any keep state
+pass out proto icmp from any to any keep state
 block log on en0 from {<blocklist>} to any
+block log on en0 from any to {<blocklist>}
 ```
 
-Use the following commands:
+Then use the following commands to manipulate the firewall:
 
 * `sudo pfctl -e -f pf.rules` to enable the firewall
 * `sudo pfctl -d` to disable the firewall
-* `sudo pfctl -t blocklist -T add 1.2.3.4` to add hosts to a blocklist
+* `sudo pfctl -t blocklist -T add 1.2.3.4` to an IP address to the blocklist
 * `sudo pfctl -t blocklist -T show` to view the blocklist
 * `sudo ifconfig pflog0 create` to create an interface for logging
-* `sudo tcpdump -ni pflog0` to dump the packets
+* `sudo tcpdump -ni pflog0` to view the filtered packets.
 
-Unless you're already familiar with packet filtering, spending too much time configuring pf is not recommended. It is also probably unnecessary if your Mac is behind a [NAT](https://www.grc.com/nat/nat.htm) on a secured home network, for example.
+Unless you're already familiar with packet filtering, spending too much time configuring pf is not recommended. It is also probably unnecessary if your Mac is behind a [NAT](https://www.grc.com/nat/nat.htm) on a secure home network.
 
-For an example of using pf to audit "phone home" behavior of user and system-level processes, see [fix-macosx/net-monitor](https://github.com/fix-macosx/net-monitor).
+It is possible to use the pf firewall to block network access to entire ranges of network addresses, for example to a whole organization:
+
+Query [Merit RADb](http://www.radb.net/) for the list of networks in use by an autonomous system, like [Facebook](https://ipinfo.io/AS32934):
+
+    $ whois -h whois.radb.net '!gAS32934'
+    
+Copy and paste the list of networks returned into the blocklist command:
+
+    $ sudo pfctl -t blocklist -T add 31.13.24.0/21 31.13.64.0/24 157.240.0.0/16
+
+Confirm the addresses were added:
+
+````
+$ sudo pfctl -t blocklist -T show
+No ALTQ support in kernel
+ALTQ related functions disabled
+   31.13.24.0/21
+   31.13.64.0/24
+   157.240.0.0/16
+````
+
+Confirm network traffic is blocked to those addresses (note that DNS requests will still work):
+
+````
+$ dig a +short facebook.com
+157.240.2.35
+
+$ curl --connect-timeout 5 -I http://facebook.com/
+*   Trying 157.240.2.35...
+* TCP_NODELAY set
+* Connection timed out after 5002 milliseconds
+* Closing connection 0
+curl: (28) Connection timed out after 5002 milliseconds
+
+$ sudo tcpdump -tqni pflog0 'host 157.240.2.35'
+IP 192.168.1.1.62771 > 157.240.2.35.80: tcp 0
+IP 192.168.1.1.62771 > 157.240.2.35.80: tcp 0
+IP 192.168.1.1.62771 > 157.240.2.35.80: tcp 0
+IP 192.168.1.1.62771 > 157.240.2.35.80: tcp 0
+IP 192.168.1.1.162771 > 157.240.2.35.80: tcp 0
+````
+
+Outgoing TCP SYN packets are blocked, so a TCP connection is not established and thus a Web site is effectively blocked at the IP layer.
+
+To use pf to audit "phone home" behavior of user and system-level processes, see [fix-macosx/net-monitor](https://github.com/fix-macosx/net-monitor).
 
 ## Services
 
@@ -653,25 +700,29 @@ Edit the hosts file as root, for example with `sudo vi /etc/hosts`. The hosts fi
 
 To block a domain, append `0 example.com` or `0.0.0.0 example.com` or `127.0.0.1 example.com` to `/etc/hosts`
 
+**Note** IPv6 uses the `AAAA` DNS record type, rather than `A` record type, so you may also want to block those connections by *also* including `::1 example.com` entries, like shown [here](http://someonewhocares.org/hosts/ipv6/).
+
 There are many lists of domains available online which you can paste in, just make sure each line starts with `0`, `0.0.0.0`, `127.0.0.1`, and the line `127.0.0.1 localhost` is included.
 
 For hosts lists, see [someonewhocares.org](http://someonewhocares.org/hosts/zero/hosts), [l1k/osxparanoia/blob/master/hosts](https://github.com/l1k/osxparanoia/blob/master/hosts), [StevenBlack/hosts](https://github.com/StevenBlack/hosts) and [gorhill/uMatrix/hosts-files.json](https://github.com/gorhill/uMatrix/blob/master/assets/umatrix/hosts-files.json).
 
-To append a raw list:
+To append a list of hosts from a list, use the `tee` command, then confirm by editing `/etc/hosts` or counting the number of lines in it:
 
 ```
 $ curl "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts" | sudo tee -a /etc/hosts
 
 $ wc -l /etc/hosts
-31998
+47476
 
-$ egrep -ve "^#|^255.255.255|^0.0.0.0|^127.0.0.1|^0 " /etc/hosts
+$ egrep -ve "^#|^255.255.255|^0.0.0.0|^127.0.0.1|^0 " /etc/hosts | sort | uniq | sort
 ::1 localhost
 fe80::1%lo0 localhost
 [should not return any other IP addresses]
 ```
 
 See `man hosts` and [FreeBSD Configuration Files](https://www.freebsd.org/doc/handbook/configtuning-configfiles.html) for more information.
+
+See the [dnsmasq](#dnsmasq) section of this guide for more hosts blocking options.
 
 #### dnscrypt
 
@@ -1427,7 +1478,9 @@ To permanently disable this feature, [clear the file](https://superuser.com/ques
 
     $ sudo chflags schg ~/Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2
 
-Furthermore, macOS attaches metadata ([HFS+ extended attributes](https://en.wikipedia.org/wiki/Extended_file_attributes#OS_X)) to downloaded files, which can be viewed with the `mdls` and `xattr` commands:
+## Metadata and artifacts
+
+macOS attaches metadata ([HFS+ extended attributes](https://en.wikipedia.org/wiki/Extended_file_attributes#OS_X)) to downloaded files, which can be viewed with the `mdls` and `xattr` commands:
 
 ```
 $ ls -l@ ~/Downloads/TorBrowser-6.0.8-osx64_en-US.dmg
@@ -1501,6 +1554,167 @@ $ xattr -d com.apple.quarantine ~/Downloads/TorBrowser-6.0.5-osx64_en-US.dmg
 $ xattr -l ~/Downloads/TorBrowser-6.0.5-osx64_en-US.dmg
 [No output after removal.]
 ```
+
+Other metadata and artifacts may be found in the directories including, but not limited to, `~/Library/Preferences/`, `~/Library/Containers/<APP>/Data/Library/Preferences`, `/Library/Preferences`, some of which is detailed below.
+
+`~/Library/Preferences/com.apple.sidebarlists.plist` contains historical list of volumes attached. To clear it, use the command `/usr/libexec/PlistBuddy -c "delete :systemitems:VolumesList" ~/Library/Preferences/com.apple.sidebarlists.plist`
+
+`/Library/Preferences/com.apple.Bluetooth.plist` contains Bluetooth metadata, including device history. If Bluetooth is not used, the metadata can be cleared with:
+
+````
+sudo defaults delete /Library/Preferences/com.apple.Bluetooth.plist DeviceCache
+sudo defaults delete /Library/Preferences/com.apple.Bluetooth.plist IDSPairedDevices
+sudo defaults delete /Library/Preferences/com.apple.Bluetooth.plist PANDevices
+sudo defaults delete /Library/Preferences/com.apple.Bluetooth.plist PANInterfaces
+sudo defaults delete /Library/Preferences/com.apple.Bluetooth.plist SCOAudioDevices
+````
+
+`/var/spool/cups` contains the CUPS printer job cache. To clear it, use the commands:
+
+````
+sudo rm -rfv /var/spool/cups/c0*
+sudo rm -rfv /var/spool/cups/tmp/*
+sudo rm -rfv /var/spool/cups/cache/job.cache*
+````
+
+To clear the list of iOS devices connected, use:
+
+````
+sudo defaults delete /Users/$USER/Library/Preferences/com.apple.iPod.plist "conn:128:Last Connect"
+sudo defaults delete /Users/$USER/Library/Preferences/com.apple.iPod.plist Devices 
+sudo defaults delete /Library/Preferences/com.apple.iPod.plist "conn:128:Last Connect"
+sudo defaults delete /Library/Preferences/com.apple.iPod.plist Devices
+sudo rm -rfv /var/db/lockdown/*
+````
+
+QuickLook thumbnail data can be cleared using the `qlmanage -r cache` command, but this writes to the file `resetreason` in the Quicklook directories, and states that the Quicklook cache was manually cleared. It can also be manually cleared by getting the directory names with `getconf DARWIN_USER_CACHE_DIR` and `sudo getconf DARWIN_USER_CACHE_DIR`, then removing them:
+
+````
+rm -rfv $(getconf DARWIN_USER_CACHE_DIR)/com.apple.QuickLook.thumbnailcache/exclusive 
+rm -rfv $(getconf DARWIN_USER_CACHE_DIR)/com.apple.QuickLook.thumbnailcache/index.sqlite 
+rm -rfv $(getconf DARWIN_USER_CACHE_DIR)/com.apple.QuickLook.thumbnailcache/index.sqlite-shm 
+rm -rfv $(getconf DARWIN_USER_CACHE_DIR)/com.apple.QuickLook.thumbnailcache/index.sqlite-wal 
+rm -rfv $(getconf DARWIN_USER_CACHE_DIR)/com.apple.QuickLook.thumbnailcache/resetreason 
+rm -rfv $(getconf DARWIN_USER_CACHE_DIR)/com.apple.QuickLook.thumbnailcache/thumbnails.data 
+````
+
+Similarly, for the root user:
+
+````
+sudo rm -rfv $(getconf DARWIN_USER_CACHE_DIR)/com.apple.QuickLook.thumbnailcache/thumbnails.fraghandler 
+sudo rm -rfv $(getconf DARWIN_USER_CACHE_DIR)/com.apple.QuickLook.thumbnailcache/exclusive 
+sudo rm -rfv $(getconf DARWIN_USER_CACHE_DIR)/com.apple.QuickLook.thumbnailcache/index.sqlite 
+sudo rm -rfv $(getconf DARWIN_USER_CACHE_DIR)/com.apple.QuickLook.thumbnailcache/index.sqlite-shm
+sudo rm -rfv $(getconf DARWIN_USER_CACHE_DIR)/com.apple.QuickLook.thumbnailcache/index.sqlite-wal
+sudo rm -rfv $(getconf DARWIN_USER_CACHE_DIR)/com.apple.QuickLook.thumbnailcache/resetreason
+sudo rm -rfv $(getconf DARWIN_USER_CACHE_DIR)/com.apple.QuickLook.thumbnailcache/thumbnails.data
+sudo rm -rfv $(getconf DARWIN_USER_CACHE_DIR)/com.apple.QuickLook.thumbnailcache/thumbnails.fraghandler
+````
+
+To clear Finder preferences:
+
+````
+defaults delete ~/Library/Preferences/com.apple.finder.plist FXDesktopVolumePositions
+defaults delete ~/Library/Preferences/com.apple.finder.plist FXRecentFolders
+defaults delete ~/Library/Preferences/com.apple.finder.plist RecentMoveAndCopyDestinations
+defaults delete ~/Library/Preferences/com.apple.finder.plist RecentSearches
+defaults delete ~/Library/Preferences/com.apple.finder.plist SGTRecentFileSearches
+````
+
+Additional diagnostic files may be found in the following directories - but caution should be taken before removing any, as it may break logging or cause other issues:
+
+````
+/var/db/CoreDuet/
+/var/db/diagnostics/
+/var/db/systemstats/
+/var/db/uuidtext/
+/var/log/DiagnosticMessages/
+````
+
+macOS stored preferred Wi-Fi data (including credentials) in nvram. To clear it, use the following commands:
+
+````
+sudo nvram -d 36C28AB5-6566-4C50-9EBD-CBB920F83843:current-network
+sudo nvram -d 36C28AB5-6566-4C50-9EBD-CBB920F83843:preferred-networks
+sudo nvram -d 36C28AB5-6566-4C50-9EBD-CBB920F83843:preferred-count 
+````
+
+macOS may collect sensitive information about what you type, even if user dictionary and suggestions are off. To remove them, and prevent them from being created again, use the following commands:
+
+````
+rm -rfv "~/Library/LanguageModeling/*" "~/Library/Spelling/*" "~/Library/Suggestions/*"
+chmod -R 000 ~/Library/LanguageModeling ~/Library/Spelling ~/Library/Suggestions
+chflags -R uchg ~/Library/LanguageModeling ~/Library/Spelling ~/Library/Suggestions
+````
+
+QuickLook application support metadata can be cleared and locked with the following commands:
+
+````
+rm -rfv "~/Library/Application Support/Quick Look/*"
+chmod -R 000 "~/Library/Application Support/Quick Look"
+chflags -R uchg "~/Library/Application Support/Quick Look"
+````
+	
+Document revision metadata is stored in `/.DocumentRevisions-V100` and can be cleared and locked with the following commands - caution should be taken as this may break some core Apple applications:
+
+````
+sudo rm -rfv /.DocumentRevisions-V100/*
+sudo chmod -R 000 /.DocumentRevisions-V100
+sudo chflags -R uchg /.DocumentRevisions-V100
+````
+
+Saved application state metadata may be cleared and locked with the following commands:
+
+````
+rm -rfv "~/Library/Saved Application State/*"
+rm -rfv "~/Library/Containers/<APPNAME>/Saved Application State"
+chmod -R 000 "~/Library/Saved Application State/"
+chmod -R 000 "~/Library/Containers/<APPNAME>/Saved Application State"
+chflags -R uchg "~/Library/Saved Application State/"
+chflags -R uchg "~/Library/Containers/<APPNAME>/Saved Application State"
+````
+
+Autosave metadata can be cleared and locked with the following commands:
+
+````
+rm -rfv "~/Library/Containers/<APP>/Data/Library/Autosave Information"
+rm -rfv "~/Library/Autosave Information"
+chmod -R 000 "~/Library/Containers/<APP>/Data/Library/Autosave Information"
+chmod -R 000 "~/Library/Autosave Information"
+chflags -R uchg "~/Library/Containers/<APP>/Data/Library/Autosave Information"
+chflags -R uchg "~/Library/Autosave Information"
+````
+
+The Siri analytics database, which is created even if the Siri launch agent disabled, can be cleared and locked with the following commands:
+
+````
+rm -rfv ~/Library/Assistant/SiriAnalytics.db
+chmod -R 000 ~/Library/Assistant/SiriAnalytics.db
+chflags -R uchg ~/Library/Assistant/SiriAnalytics.db
+````
+
+`~/Library/Preferences/com.apple.iTunes.plist` contains iTunes metadata. Recent iTunes search data may be cleared with the following command:
+
+````
+defaults delete ~/Library/Preferences/com.apple.iTunes.plist recentSearches
+````
+
+If you do not use Apple ID-linked services, the following keys may be cleared, too, using the following commands:
+
+````
+defaults delete ~/Library/Preferences/com.apple.iTunes.plist StoreUserInfo
+defaults delete ~/Library/Preferences/com.apple.iTunes.plist WirelessBuddyID
+````
+
+`~/Library/Containers/com.apple.QuickTimePlayerX/Data/Library/Preferences/com.apple.QuickTimePlayerX.plist` contains all media played in QuickTime Player.
+
+Additional metadata may exist in the following files:
+
+````
+~/Library/Containers/com.apple.appstore/Data/Library/Preferences/com.apple.commerce.knownclients.plist
+~/Library/Preferences/com.apple.commerce.plist
+~/Library/Preferences/com.apple.QuickTimePlayerX.plist 
+````
 
 ## Passwords
 
@@ -2017,7 +2231,6 @@ If you want to retain the convenience of the root user having a non-root user's 
 export HOME=/Users/blah
 ````
 
-
 ## Related software
 
 [Santa](https://github.com/google/santa/) - A binary whitelisting/blacklisting system for macOS.
@@ -2028,7 +2241,7 @@ export HOME=/Users/blah
 
 [Dylib Hijack Scanner](https://objective-see.com/products/dhs.html) - scan for applications that are either susceptible to dylib hijacking or have been hijacked.
 
-[Little Flocker](https://www.littleflocker.com/) - "Little Snitch for files"; prevents applications from accessing files.
+[F-Secure XFENCE](https://campaigns.f-secure.com/xfence/) (formerly [Little Flocker](https://github.com/drduh/macOS-Security-and-Privacy-Guide/pull/237)) - "Little Snitch for files"; prevents applications from accessing files.
 
 [facebook/osquery](https://github.com/facebook/osquery) - can be used to retrieve low level system information.  Users can write SQL queries to retrieve system information.
 
@@ -2119,3 +2332,15 @@ export HOME=/Users/blah
 [Mac OS X and iOS Internals: To the Apple's Core by Jonathan Levin](https://www.amazon.com/Mac-OS-iOS-Internals-Apples/dp/1118057651)
 
 [Demystifying the i-Device NVMe NAND (New storage used by Apple)](http://ramtin-amin.fr/#nvmepcie)
+
+[The macOS Phishing Easy Button: AppleScript Dangers](https://duo.com/blog/the-macos-phishing-easy-button-applescript-dangers)
+
+[Over The Air - Vol. 2, Pt. 1: Exploiting The Wi-Fi Stack on Apple Devices](https://googleprojectzero.blogspot.com/2017/09/over-air-vol-2-pt-1-exploiting-wi-fi.html)
+
+[The Great DOM Fuzz-off of 2017](https://googleprojectzero.blogspot.be/2017/09/the-great-dom-fuzz-off-of-2017.html)
+
+[Remote code execution, git, and OS X](https://rachelbythebay.com/w/2016/04/17/unprotected/)
+
+[OSX.Pirrit Mac Adware Part III: The DaVinci Code](https://www.cybereason.com/blog/targetingedge-mac-os-x-pirrit-malware-adware-still-active)
+
+[How to make macOS Spotlight fuck the fuck off and do your bidding](https://m4.rkw.io/blog/how-to-make-macos-spotlight-fuck-the-fuck-off-and-do-your-bidding.html)
